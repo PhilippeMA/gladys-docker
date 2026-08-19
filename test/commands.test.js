@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { pollContainerDevice, setContainerValue } from '../src/commands.js';
 import { createRegistry } from '../src/registry.js';
 import { normalizeConfig } from '../src/config.js';
-import { FEATURE } from '../src/devices/container.js';
+import { ACTIONS, FEATURE } from '../src/devices/container.js';
 import { createFakeGladys } from './helpers/fakeGladys.js';
 import { createFakeDockerClient, rawContainer } from './helpers/fakeDocker.js';
 
@@ -41,7 +41,7 @@ test('polling publishes the state and the stats of a running container', async (
   const byFeature = Object.fromEntries(
     gladys.published.map((p) => [p.featureExternalId, p.state ?? p.text]),
   );
-  assert.equal(byFeature[`${device.external_id}:${FEATURE.ON_OFF}`], 1);
+  assert.equal(byFeature[`${device.external_id}:${FEATURE.RUNNING}`], 1);
   assert.equal(byFeature[`${device.external_id}:${FEATURE.STATE}`], 'running');
   assert.equal(byFeature[`${device.external_id}:${FEATURE.CPU}`], 20);
   assert.equal(byFeature[`${device.external_id}:${FEATURE.MEMORY}`], 100);
@@ -114,7 +114,7 @@ test('turning a container on sends a start and publishes the confirmed state', a
 
   await setContainerValue(gladys, registry, config, {
     device,
-    feature: { external_id: `${device.external_id}:${FEATURE.ON_OFF}` },
+    feature: { external_id: `${device.external_id}:${FEATURE.RUNNING}` },
     value: 1,
   });
 
@@ -130,7 +130,7 @@ test('turning a container off sends a stop carrying the configured grace period'
 
   await setContainerValue(gladys, registry, normalizeConfig({ ...config, stop_timeout: 25 }), {
     device,
-    feature: { external_id: `${device.external_id}:${FEATURE.ON_OFF}` },
+    feature: { external_id: `${device.external_id}:${FEATURE.RUNNING}` },
     value: 0,
   });
 
@@ -142,7 +142,7 @@ test('a command re-reads the daemon instead of trusting its cached list', async 
 
   await setContainerValue(gladys, registry, config, {
     device,
-    feature: { external_id: `${device.external_id}:${FEATURE.ON_OFF}` },
+    feature: { external_id: `${device.external_id}:${FEATURE.RUNNING}` },
     value: 1,
   });
 
@@ -158,6 +158,79 @@ test('a read-only feature refuses to be commanded', async () => {
       setContainerValue(gladys, registry, config, {
         device,
         feature: { external_id: `${device.external_id}:${FEATURE.CPU}` },
+        value: 1,
+      }),
+    /read-only/,
+  );
+});
+
+test('each push button sends its own Docker order', async () => {
+  const cases = [
+    [FEATURE.START, 'POST /containers/c0ffee00/start'],
+    [FEATURE.STOP, 'POST /containers/c0ffee00/stop?t=10'],
+    [FEATURE.RESTART, 'POST /containers/c0ffee00/restart?t=10'],
+  ];
+  for (const [key, expected] of cases) {
+    const { gladys, registry, client, device } = createRig();
+    // A push button always sends 1: the feature it sits on carries the meaning.
+    await setContainerValue(gladys, registry, config, {
+      device,
+      feature: { external_id: `${device.external_id}:${key}` },
+      value: 1,
+    });
+    assert.ok(client.calls.includes(expected), `${key} should send ${expected}`);
+  }
+});
+
+test('the action select carries the order as its string value', async () => {
+  const { gladys, registry, client, device } = createRig();
+
+  await setContainerValue(gladys, registry, config, {
+    device,
+    feature: { external_id: `${device.external_id}:${FEATURE.ACTION}` },
+    value: ACTIONS.RESTART,
+  });
+
+  assert.ok(client.calls.includes('POST /containers/c0ffee00/restart?t=10'));
+});
+
+test('an action the select never offered is refused', async () => {
+  const { gladys, registry, client, device } = createRig();
+
+  await assert.rejects(
+    () =>
+      setContainerValue(gladys, registry, config, {
+        device,
+        feature: { external_id: `${device.external_id}:${FEATURE.ACTION}` },
+        value: 'destroy',
+      }),
+    /Unknown action "destroy"/,
+  );
+  assert.equal(client.calls.length, 0, 'nothing reached the daemon');
+});
+
+test('a device created before the buttons existed still obeys its switch', async () => {
+  // Its On/Off feature was an actuator; re-publishing does not rewrite the
+  // features of an already-created device, so 0/1 keeps arriving here.
+  const { gladys, registry, client, device } = createRig();
+
+  await setContainerValue(gladys, registry, config, {
+    device,
+    feature: { external_id: `${device.external_id}:${FEATURE.RUNNING}` },
+    value: 0,
+  });
+
+  assert.ok(client.calls.includes('POST /containers/c0ffee00/stop?t=10'));
+});
+
+test('a read-only feature still refuses to be commanded', async () => {
+  const { gladys, registry, device } = createRig();
+
+  await assert.rejects(
+    () =>
+      setContainerValue(gladys, registry, config, {
+        device,
+        feature: { external_id: `${device.external_id}:${FEATURE.STATE}` },
         value: 1,
       }),
     /read-only/,

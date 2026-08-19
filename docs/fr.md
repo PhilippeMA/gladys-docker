@@ -97,16 +97,26 @@ Les autres réglages :
 
 ## À quoi ressemble un conteneur dans Gladys
 
-| Fonctionnalité | Type         | Ce qu'elle fait                                               |
-| -------------- | ------------ | ------------------------------------------------------------- |
-| On/Off         | Interrupteur | Démarre et arrête le conteneur. Utilisable dans les scènes.   |
-| État           | Texte        | `running`, `exited`, `restarting`, `paused`…                  |
-| CPU            | Pourcentage  | Même échelle que `docker stats` : 200 % = deux cœurs saturés. |
-| Mémoire        | Mégaoctets   | Mémoire de travail, cache de pages exclu.                     |
+| Fonctionnalité         | Ce qu'elle fait                                                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Running                | Badge en lecture seule : allumé ou éteint. Garde son historique et sert de condition dans une scène (« si le conteneur tourne »).                                                                           |
+| État                   | `running`, `exited`, `restarting`, `paused`…                                                                                                                                                                |
+| Start / Stop / Restart | Un bouton poussoir chacun. Toujours les trois : Gladys ne sait pas masquer une fonctionnalité selon l'état, mais appuyer sur Start quand le conteneur tourne ne fait rien (Docker répond « déjà démarré »). |
+| Action                 | Un contrôle unique qui ne propose que ce qui a du sens à l'instant — Start si le conteneur est arrêté, Stop et Restart s'il tourne.                                                                         |
+| CPU                    | Pourcentage, même échelle que `docker stats` : 200 % = deux cœurs saturés.                                                                                                                                  |
+| Mémoire                | Mégaoctets, cache de pages exclu.                                                                                                                                                                           |
 
 Les conteneurs créés par Docker Compose sont nommés `projet · service` ; les
 autres gardent leur nom de conteneur. La page de l'appareil affiche aussi
 l'image utilisée et, pour un conteneur Compose, son projet et son service.
+
+Deux libellés viennent de Gladys et non de cette intégration. La ligne CPU
+s'intitule **« Température »** : Gladys n'a aucune catégorie CPU, la
+fonctionnalité emprunte donc celle dont l'icône est une puce de processeur — la
+valeur et son unité en pourcentage sont justes, seul le mot ne l'est pas. La
+ligne Running s'intitule **« Commutateur »** pour la même raison. Les deux se
+renomment définitivement dans un tableau de bord, via le crayon du bloc
+« Appareils d'une pièce ».
 
 Chaque appareil porte un badge **local**, qui passe à l'orange quand le
 conteneur mérite un coup d'œil — redémarrages en boucle, en pause, mort, ou en

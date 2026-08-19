@@ -4,10 +4,15 @@
 // -----------------------------------------------------------------------------
 
 import { createLogger } from '@gladysassistant/integration-sdk';
-import { getContainerStats, startContainer, stopContainer } from './docker/api.js';
+import {
+  getContainerStats,
+  restartContainer,
+  startContainer,
+  stopContainer,
+} from './docker/api.js';
 import { isRunning } from './docker/containers.js';
 import { summarizeStats } from './docker/stats.js';
-import { buildContainerStates, FEATURE } from './devices/container.js';
+import { ACTIONS, buildContainerStates, FEATURE } from './devices/container.js';
 
 const logger = createLogger({ name: 'commands' });
 
@@ -63,38 +68,79 @@ export async function pollContainerDevice(gladys, registry, config, device) {
 }
 
 /**
- * Run a user command on a container device.
+ * The action a commanded feature stands for. The three push buttons each mean
+ * one order; the select carries the order as its string value; and the historic
+ * On/Off switch is still honored so devices created before the buttons existed
+ * keep working.
+ * @param {object} feature - Commanded feature.
+ * @param {unknown} value - Value Gladys sent.
+ * @returns {string} One of ACTIONS.
+ */
+function resolveAction(feature, value) {
+  const key = feature.external_id.split(':').pop();
+
+  if (key === FEATURE.START || key === FEATURE.STOP || key === FEATURE.RESTART) {
+    return key;
+  }
+  if (key === FEATURE.ACTION) {
+    const action = String(value);
+    if (!Object.values(ACTIONS).includes(action)) {
+      throw new Error(`Unknown action "${action}"`);
+    }
+    return action;
+  }
+  if (key === FEATURE.RUNNING) {
+    // Devices created before this feature became a read-only badge still send
+    // 0/1 here. Honor it rather than failing on a device the user never
+    // re-added.
+    return Number(value) === 1 ? ACTIONS.START : ACTIONS.STOP;
+  }
+  throw new Error(`Feature ${feature.external_id} is read-only`);
+}
+
+/**
+ * Run one order against a container.
+ * @param {object} client - Docker client.
+ * @param {object} container - Normalized container.
+ * @param {string} action - One of ACTIONS.
+ * @param {Record<string, unknown>} config - Normalized configuration.
+ * @returns {Promise<void>} Resolves once the daemon acknowledged.
+ */
+async function runAction(client, container, action, config) {
+  logger.info(`${action} -> container ${container.name}`);
+  if (action === ACTIONS.START) {
+    await startContainer(client, container.id);
+  } else if (action === ACTIONS.STOP) {
+    await stopContainer(client, container.id, config.stop_timeout);
+  } else {
+    await restartContainer(client, container.id, config.stop_timeout);
+  }
+}
+
+/**
+ * Run a user command on a container device: a push button, a choice in the
+ * action select, or the historic On/Off switch.
  *
- * `has_feedback` is true on the On/Off feature, so the state published here is
- * the one the daemon reports AFTER the command, not the one that was asked
- * for: a container that dies on startup shows up as off, as it should.
+ * The states published afterwards are the ones the daemon reports AFTER the
+ * command, never the ones that were asked for: a container that dies on
+ * startup shows up as stopped, as it should.
  * @param {object} gladys - SDK instance.
  * @param {object} registry - Registry.
  * @param {Record<string, unknown>} config - Normalized configuration.
  * @param {object} params - Command parameters.
  * @param {object} params.device - Target device.
  * @param {object} params.feature - Target feature.
- * @param {number} params.value - Requested value.
- * @returns {Promise<void>} Resolves once the confirmed state is published.
+ * @param {number|string} params.value - Requested value.
+ * @returns {Promise<object>} The container as the daemon reports it afterwards.
  */
 export async function setContainerValue(gladys, registry, config, { device, feature, value }) {
-  if (!feature.external_id.endsWith(`:${FEATURE.ON_OFF}`)) {
-    throw new Error(`Feature ${feature.external_id} is read-only`);
-  }
-
+  const action = resolveAction(feature, value);
   const container = await resolveContainer(registry, config, device.external_id);
-  const client = registry.getClient(config);
-  const shouldRun = Number(value) === 1;
 
-  logger.info(`${shouldRun ? 'Starting' : 'Stopping'} container ${container.name}`);
-  if (shouldRun) {
-    await startContainer(client, container.id);
-  } else {
-    await stopContainer(client, container.id, config.stop_timeout);
-  }
+  await runAction(registry.getClient(config), container, action, config);
 
-  // Re-read the daemon: this is the feedback the feature promises.
   const confirmed = await resolveContainer(registry, config, device.external_id, { force: true });
   logger.info(`Container ${confirmed.name} is now ${confirmed.state}`);
   await gladys.publishStates(buildContainerStates(gladys, confirmed));
+  return confirmed;
 }

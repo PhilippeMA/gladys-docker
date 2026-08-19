@@ -73,6 +73,35 @@ The full list of NOT NULL feature columns the integration must supply:
 `min`, `max`. (`keep_history` has a default; `unit` and `step` are nullable,
 and `step` must be `> 0` when present.)
 
+### A device is not polled unless it says so
+
+`t_device.should_poll` defaults to **false**, and `device.add` only schedules a
+device when `should_poll === true && poll_frequency`. Publishing a frequency
+alone creates a device Gladys accepts, creates, and then never polls — every
+feature stays empty forever, with nothing in any log to explain it. Publish
+both.
+
+### Rendering is decided by the category/type pair, not by your names
+
+Two front-end maps, both keyed by `category.type`, decide what a feature looks
+like — and a feature name you chose is usually ignored:
+
+- the icon comes from `DeviceFeatureCategoriesIcon`. **A sensor row has no
+  fallback**: a missing pair renders `fe-undefined`, i.e. no icon at all.
+  (Push buttons and selects do have a fallback.)
+- the row label comes from the i18n key `deviceFeatureCategory.<category>.<type>`
+  — _unless_ another feature of the same device shares the same `type`, in
+  which case Gladys falls back to the feature `name`. That quirk
+  (`shouldDisplayDeviceName`) is why the three push buttons show "Start",
+  "Stop" and "Restart" rather than a generic wording.
+
+Check both maps before choosing a pair. `unknown`/`decimal` exists server-side
+and renders blank, which is how the CPU feature shipped without an icon or a
+label.
+
+`read_only` decides the whole widget: `true` routes to the sensor renderer
+(a badge), `false` to a control — a toggle, a push button, a select.
+
 ### Categories and types are validated independently
 
 Both are flat ENUM lists — the core never checks that a type belongs to its
@@ -86,6 +115,12 @@ category, and no server-side rule couples the unit to either. That is why
 - Device `params`: `name` and `value` are both NOT NULL and `value` is a
   string. The `GLADYS_` prefix is reserved to the core.
 - Max 2000 devices in one discovery payload.
+- `supported_options`: every option needs a non-empty string `label` (one
+  language only, no multi-language object) and values must be unique. String
+  values are accepted **only** on a `text`/`select` feature; anywhere else the
+  core refuses the state later. They are upserted onto already-created devices
+  on every re-publish, which is the only way to make a control's choices follow
+  a device's state.
 - `setConnectionStatus` messages need an `en` key; every value must be a string.
 
 ## Checking a rule rather than guessing it
@@ -105,6 +140,10 @@ cd Gladys && git sparse-checkout set server front/src
 - `front/src/routes/integration/all/mqtt/device-page/utils.js`
   (`getFeatureDefaultValues`) — the min/max/read_only conventions per
   category and type
+- `front/src/utils/consts.js` (`DeviceFeatureCategoriesIcon`),
+  `front/src/config/i18n/fr.json` (`deviceFeatureCategory`) and
+  `front/src/components/boxs/device-in-room/DeviceRow.jsx` — which pairs
+  actually render, and as what
 
 When a new rule is found, mirror it in `test/helpers/gladysContract.js` and add
 it above. A rule that only lives in a commit message will be broken again.

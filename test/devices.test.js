@@ -25,7 +25,7 @@ const nginx = normalizeContainer(rawContainer());
 test('the external id is built from the container name, not from its id', () => {
   const ids = containerExternalIds(gladys, 'nginx');
   assert.equal(ids.device, 'ext:docker:container:nginx');
-  assert.equal(ids.feature(FEATURE.ON_OFF), 'ext:docker:container:nginx:on-off');
+  assert.equal(ids.feature(FEATURE.RUNNING), 'ext:docker:container:nginx:on-off');
   // Recreating a container gives it a new id but keeps its name: the device
   // must stay the same one for Gladys.
   const recreated = normalizeContainer(rawContainer({ Id: 'brand-new-id' }));
@@ -51,21 +51,64 @@ test('the poll frequency is passed to Gladys in the milliseconds it expects', ()
   assert.equal(device.poll_frequency, 30_000);
 });
 
-test('a container device carries a controllable On/Off and a read-only state', () => {
+test('a container device shows its state read-only and acts through buttons', () => {
   const device = buildContainerDevice(gladys, nginx, config);
   assert.equal(device.external_id, 'ext:docker:container:nginx');
   assert.equal(device.poll_frequency, config.poll_frequency);
 
-  const onOff = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.ON_OFF}`));
-  assert.equal(onOff.category, DEVICE_FEATURE_CATEGORIES.SWITCH);
-  assert.equal(onOff.type, DEVICE_FEATURE_TYPES.SWITCH.BINARY);
-  assert.equal(onOff.read_only, false);
-  assert.equal(onOff.has_feedback, true);
+  // The former switch is now a badge: the buttons do the acting, but it keeps
+  // its history and stays usable as a scene condition.
+  const running = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.RUNNING}`));
+  assert.equal(running.category, DEVICE_FEATURE_CATEGORIES.SWITCH);
+  assert.equal(running.type, DEVICE_FEATURE_TYPES.SWITCH.BINARY);
+  assert.equal(running.read_only, true);
+  assert.equal(running.keep_history, true);
 
   const state = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.STATE}`));
   assert.equal(state.category, DEVICE_FEATURE_CATEGORIES.TEXT);
   assert.equal(state.type, DEVICE_FEATURE_TYPES.TEXT.TEXT);
   assert.equal(state.read_only, true);
+});
+
+test('the three orders are commandable push buttons', () => {
+  const device = buildContainerDevice(gladys, nginx, config);
+  for (const key of [FEATURE.START, FEATURE.STOP, FEATURE.RESTART]) {
+    const button = device.features.find((f) => f.external_id.endsWith(`:${key}`));
+    assert.ok(button, `${key} button is missing`);
+    assert.equal(button.category, DEVICE_FEATURE_CATEGORIES.BUTTON);
+    assert.equal(button.type, DEVICE_FEATURE_TYPES.BUTTON.PUSH);
+    assert.equal(button.read_only, false);
+    // The range Gladys gives a commandable push button.
+    assert.deepEqual([button.min, button.max], [1, 1]);
+  }
+});
+
+test('the action select offers only what the current state allows', () => {
+  const running = buildContainerDevice(gladys, nginx, config).features.find((f) =>
+    f.external_id.endsWith(`:${FEATURE.ACTION}`),
+  );
+  assert.equal(running.type, DEVICE_FEATURE_TYPES.TEXT.SELECT);
+  assert.equal(running.read_only, false);
+  assert.deepEqual(
+    running.supported_options.map((o) => o.value),
+    ['stop', 'restart'],
+    'a running container cannot be started',
+  );
+
+  const stopped = normalizeContainer(rawContainer({ State: 'exited', Status: 'Exited (0)' }));
+  const options = buildContainerDevice(gladys, stopped, config).features.find((f) =>
+    f.external_id.endsWith(`:${FEATURE.ACTION}`),
+  ).supported_options;
+  assert.deepEqual(
+    options.map((o) => o.value),
+    ['start'],
+    'a stopped container can only be started',
+  );
+  // The core validates these: a non-empty string label on every option.
+  for (const option of options) {
+    assert.equal(typeof option.label, 'string');
+    assert.ok(option.label.length > 0);
+  }
 });
 
 test('the stats features are added only when the user asked for them', () => {
@@ -78,8 +121,14 @@ test('the stats features are added only when the user asked for them', () => {
   assert.equal(memory.type, DEVICE_FEATURE_TYPES.DATA.SIZE);
   assert.equal(memory.unit, DEVICE_FEATURE_UNITS.MEGABYTE);
 
-  const without = buildContainerDevice(gladys, nginx, normalizeConfig({ collect_stats: false }));
-  assert.equal(without.features.length, 2);
+  const withoutStats = buildContainerDevice(
+    gladys,
+    nginx,
+    normalizeConfig({ collect_stats: false }),
+  );
+  assert.ok(!withoutStats.features.some((f) => f.external_id.endsWith(`:${FEATURE.CPU}`)));
+  assert.ok(!withoutStats.features.some((f) => f.external_id.endsWith(`:${FEATURE.MEMORY}`)));
+  assert.equal(withStats.features.length, withoutStats.features.length + 2);
 });
 
 test('feature external ids are unique inside a device', () => {
@@ -149,7 +198,7 @@ test('every feature declares the min and max Gladys stores as NOT NULL', () => {
 
 test('the binary and text features use the ranges Gladys assigns to them', () => {
   const device = buildContainerDevice(gladys, nginx, config);
-  const onOff = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.ON_OFF}`));
+  const onOff = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.RUNNING}`));
   const state = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.STATE}`));
 
   assert.deepEqual([onOff.min, onOff.max], [0, 1], 'a binary switch spans 0..1');
@@ -157,4 +206,13 @@ test('the binary and text features use the ranges Gladys assigns to them', () =>
   // A string is not aggregatable, and the On/Off feature already records the
   // running / not-running timeline.
   assert.equal(state.keep_history, false);
+});
+
+test('a polled device asks Gladys to actually poll it', () => {
+  // should_poll defaults to false in the database: publishing a frequency
+  // without it creates a device that is never refreshed, with no error
+  // anywhere to explain why every feature stays empty.
+  const device = buildContainerDevice(gladys, nginx, config);
+  assert.equal(device.should_poll, true);
+  assert.equal(device.poll_frequency, config.poll_frequency);
 });

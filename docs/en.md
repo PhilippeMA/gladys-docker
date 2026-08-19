@@ -90,16 +90,25 @@ The other settings:
 
 ## What each container looks like in Gladys
 
-| Feature | Type       | What it does                                             |
-| ------- | ---------- | -------------------------------------------------------- |
-| On/Off  | Switch     | Starts and stops the container. Usable in scenes.        |
-| State   | Text       | `running`, `exited`, `restarting`, `paused`…             |
-| CPU     | Percentage | Same scale as `docker stats`: 200% means two full cores. |
-| Memory  | Megabytes  | Working memory, page cache excluded.                     |
+| Feature                | What it does                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Running                | Read-only badge: on or off. Keeps its history, and works as a scene condition ("if the container is running").                                                                        |
+| State                  | `running`, `exited`, `restarting`, `paused`…                                                                                                                                          |
+| Start / Stop / Restart | One push button each. Always all three: Gladys cannot hide a feature depending on a state, but pressing Start on a running container does nothing (Docker answers "already started"). |
+| Action                 | A single control offering only what makes sense right now — Start when the container is stopped, Stop and Restart when it runs.                                                       |
+| CPU                    | Percentage, same scale as `docker stats`: 200% means two full cores.                                                                                                                  |
+| Memory                 | Megabytes, page cache excluded.                                                                                                                                                       |
 
 Containers created by Docker Compose are named `project · service`; the others
 keep their container name. The device page also shows the image the container
 runs and, for a Compose container, its project and service.
+
+Two labels come from Gladys, not from this integration. The CPU row reads
+**"Temperature"**: Gladys has no CPU category, so the feature borrows the one
+whose icon is a processor chip — the value and its percent unit are correct,
+only the wording is not. The Running row reads **"Switch"** for the same
+reason. Both can be renamed for good in a dashboard, from the pencil icon of
+the "Devices in room" box.
 
 A device carries a **local** badge, which turns orange when the container needs
 attention — restarting in a loop, paused, dead, or failing its own health check

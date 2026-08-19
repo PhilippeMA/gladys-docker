@@ -2,8 +2,8 @@
 
 Manage the Docker containers of your server from
 [Gladys Assistant](https://gladysassistant.com): one Gladys device per
-container, with an On/Off switch that starts and stops it, its Docker state,
-and its CPU and memory usage.
+container, showing whether it runs and what it consumes, with push buttons to
+start, stop and restart it.
 
 Built on the official
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
@@ -11,12 +11,14 @@ from the [JavaScript integration template](https://github.com/GladysAssistant/in
 
 ## What you get
 
-| Feature | Type       | Behaviour                                                            |
-| ------- | ---------- | -------------------------------------------------------------------- |
-| On/Off  | Switch     | Starts / stops the container. Usable in scenes and on the dashboard. |
-| State   | Text       | `running`, `exited`, `restarting`, `paused`…                         |
-| CPU     | Percentage | Same scale as `docker stats`: 200% means two saturated cores.        |
-| Memory  | Megabytes  | Working memory, page cache excluded (as `docker stats` reports it).  |
+| Feature                | Behaviour                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Running                | Read-only badge, plus the scene condition "if the container is running".                                           |
+| State                  | `running`, `exited`, `restarting`, `paused`…                                                                       |
+| Start / Stop / Restart | A push button each. Always all three — Gladys cannot hide a feature by state — and harmless to press in any state. |
+| Action                 | A select offering only the orders the current state allows, kept in step through `supported_options`.              |
+| CPU                    | Percentage, same scale as `docker stats`: 200% means two saturated cores.                                          |
+| Memory                 | Megabytes, page cache excluded (as `docker stats` reports it).                                                     |
 
 Plus three buttons in the Configuration screen: **Test the Docker connection**,
 **List the matching containers** and **Restart a container**.

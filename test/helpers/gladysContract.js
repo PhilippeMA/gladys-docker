@@ -73,6 +73,14 @@ export function assertGladysAcceptsDevices(devices, externalIdPrefix = 'ext:dock
         GLADYS_POLL_FREQUENCIES.includes(device.poll_frequency),
         `${where}.poll_frequency: ${device.poll_frequency} is not a frequency Gladys accepts`,
       );
+      // t_device.should_poll defaults to false, and device.add only schedules
+      // a device when it is true. A frequency without it is a device Gladys
+      // accepts, creates, and then never polls — silently.
+      assert.equal(
+        device.should_poll,
+        true,
+        `${where}.should_poll: must be true, or the poll_frequency is dead weight and the device is never polled`,
+      );
     }
     assert.ok(Array.isArray(device.features), `${where}.features must be an array`);
 
@@ -113,6 +121,38 @@ export function assertGladysAcceptsDevices(devices, externalIdPrefix = 'ext:dock
       );
       if (feature.step !== undefined && feature.step !== null) {
         assert.ok(feature.step > 0, `${featureWhere}.step: must be greater than 0`);
+      }
+
+      // Gate 1 also runs normalizeSupportedOptions: a non-empty string label on
+      // every option, no duplicate values, and string values only on the
+      // text/select feature — anywhere else they produce a state the core
+      // refuses to persist.
+      if (feature.supported_options !== undefined) {
+        assert.ok(Array.isArray(feature.supported_options), `${featureWhere}.supported_options`);
+        const isDynamicSelect =
+          feature.category === DEVICE_FEATURE_CATEGORIES.TEXT &&
+          feature.type === DEVICE_FEATURE_TYPES.TEXT.SELECT;
+        const seen = new Set();
+        feature.supported_options.forEach((option, optionIndex) => {
+          const optionWhere = `${featureWhere}.supported_options[${optionIndex}]`;
+          assert.equal(typeof option.label, 'string', `${optionWhere}.label: must be a string`);
+          assert.ok(option.label.trim().length > 0, `${optionWhere}.label: must not be empty`);
+          if (typeof option.value === 'string') {
+            assert.ok(
+              isDynamicSelect,
+              `${optionWhere}.value: string values are only allowed on a text/select feature`,
+            );
+            assert.ok(option.value.trim().length > 0, `${optionWhere}.value: must not be empty`);
+          } else {
+            assert.ok(
+              Number.isInteger(option.value),
+              `${optionWhere}.value: must be an integer or a string`,
+            );
+          }
+          const key = `${option.value}`;
+          assert.ok(!seen.has(key), `${optionWhere}.value: duplicate value "${key}"`);
+          seen.add(key);
+        });
       }
     });
 

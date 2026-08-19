@@ -36,11 +36,14 @@ gladys.onScanRequest(async () => {
   await refreshDevices();
 });
 
-// --- Command: the user flips a container On/Off ------------------------------
+// --- Command: a push button, the action select, or the legacy switch ---------
 gladys.onSetValue(async (device, feature, value) => {
   logger.info(`onSetValue <- ${feature.external_id} = ${value}`);
   // Throwing acks the command as failed, and Gladys shows the reason.
   await setContainerValue(gladys, registry, config, { device, feature, value });
+  // The action select only offers the orders that make sense for the current
+  // state, so its options have to follow what just happened.
+  await republishDevices();
 });
 
 // --- Polling: Gladys asks to refresh one container ---------------------------
@@ -48,12 +51,26 @@ gladys.onPoll(async (device) => {
   await pollContainerDevice(gladys, registry, config, device);
 });
 
+// --- A device was just added from the Discovery tab --------------------------
+// Without this, a brand new device sits empty until the first scheduled poll —
+// up to a minute of a dashboard showing nothing at all.
+gladys.onDeviceCreated(async (device) => {
+  logger.info(`onDeviceCreated -> ${device.external_id}, publishing a first reading`);
+  try {
+    await pollContainerDevice(gladys, registry, config, device);
+  } catch (err) {
+    logger.error(`First reading of ${device.external_id} failed: ${err.message}`);
+  }
+});
+
 // --- Manifest actions: the buttons of the Configuration screen ---------------
 gladys.onAction('test_connection', () => testConnection(registry, config));
 gladys.onAction('list_containers', () => listMatchingContainers(registry, config));
-gladys.onAction('restart_container', (fields) =>
-  restartChosenContainer(gladys, registry, config, fields.device),
-);
+gladys.onAction('restart_container', async (fields) => {
+  const message = await restartChosenContainer(gladys, registry, config, fields.device);
+  await republishDevices();
+  return message;
+});
 
 // --- Configuration updated by the user ---------------------------------------
 gladys.onConfigUpdated(async (newConfig) => {
@@ -74,6 +91,7 @@ gladys.on('connected', async () => {
     config = normalizeConfig(await gladys.getConfig());
     await refreshDevices();
     startDiscoveryLoop();
+    await publishCreatedDeviceStates();
   } catch (err) {
     logger.error('Post-connection initialization failed', err);
   }
@@ -139,6 +157,50 @@ async function refreshDevices() {
             ),
           },
     );
+  }
+}
+
+/**
+ * Re-publish the device list without touching the connection status.
+ *
+ * Only the action select needs this: the core upserts `supported_options` onto
+ * the already-created devices on every re-publish, which is how the select
+ * stops offering "Start" the moment the container is running. A failure here
+ * costs a stale menu, not a broken command, so it is logged and swallowed.
+ * @returns {Promise<void>} Resolves once re-published.
+ */
+async function republishDevices() {
+  try {
+    await gladys.publishDiscoveredDevices(registry.buildDiscoveredDevices(config));
+  } catch (err) {
+    logger.warn(`Cannot refresh the action choices: ${err.message}`);
+  }
+}
+
+/**
+ * Publish a fresh reading for every container device the user has already
+ * created, so a restart of the integration does not leave the dashboard empty
+ * until the next scheduled poll.
+ *
+ * Sequential on purpose: each reading costs the daemon about a second when the
+ * stats are collected, and firing twenty of them at once is how you make Docker
+ * unresponsive at the exact moment the user is looking at it. A device that
+ * fails is logged and skipped — one unreadable container must not stop the rest.
+ * @returns {Promise<void>} Resolves once every device has been attempted.
+ */
+async function publishCreatedDeviceStates() {
+  const created = await gladys.getDevices();
+  const ours = created.filter((device) => registry.findByExternalId(device.external_id));
+  if (ours.length === 0) {
+    return;
+  }
+  logger.info(`Publishing a first reading for ${ours.length} existing device(s)`);
+  for (const device of ours) {
+    try {
+      await pollContainerDevice(gladys, registry, config, device);
+    } catch (err) {
+      logger.warn(`Cannot read ${device.external_id}: ${err.message}`);
+    }
   }
 }
 
