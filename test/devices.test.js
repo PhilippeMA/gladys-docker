@@ -1,0 +1,133 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  DEVICE_FEATURE_CATEGORIES,
+  DEVICE_FEATURE_TYPES,
+  DEVICE_FEATURE_UNITS,
+} from '@gladysassistant/integration-sdk';
+import {
+  buildContainerDevice,
+  buildContainerStates,
+  containerDeviceName,
+  containerExternalIds,
+  FEATURE,
+} from '../src/devices/container.js';
+import { normalizeContainer } from '../src/docker/containers.js';
+import { normalizeConfig } from '../src/config.js';
+import { createFakeGladys } from './helpers/fakeGladys.js';
+import { rawContainer } from './helpers/fakeDocker.js';
+
+const gladys = createFakeGladys();
+const config = normalizeConfig({ docker_api_url: 'http://docker.test:2375' });
+const nginx = normalizeContainer(rawContainer());
+
+test('the external id is built from the container name, not from its id', () => {
+  const ids = containerExternalIds(gladys, 'nginx');
+  assert.equal(ids.device, 'ext:docker:container:nginx');
+  assert.equal(ids.feature(FEATURE.ON_OFF), 'ext:docker:container:nginx:on-off');
+  // Recreating a container gives it a new id but keeps its name: the device
+  // must stay the same one for Gladys.
+  const recreated = normalizeContainer(rawContainer({ Id: 'brand-new-id' }));
+  assert.equal(containerExternalIds(gladys, recreated.name).device, ids.device);
+});
+
+test('a compose container is named "project · service"', () => {
+  const container = normalizeContainer(
+    rawContainer({
+      Names: ['/media-plex-1'],
+      Labels: { 'com.docker.compose.project': 'media', 'com.docker.compose.service': 'plex' },
+    }),
+  );
+  assert.equal(containerDeviceName(container), 'media · plex');
+});
+
+test('a standalone container keeps its own name', () => {
+  assert.equal(containerDeviceName(nginx), 'nginx');
+});
+
+test('a container device carries a controllable On/Off and a read-only state', () => {
+  const device = buildContainerDevice(gladys, nginx, config);
+  assert.equal(device.external_id, 'ext:docker:container:nginx');
+  assert.equal(device.poll_frequency, config.poll_frequency);
+
+  const onOff = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.ON_OFF}`));
+  assert.equal(onOff.category, DEVICE_FEATURE_CATEGORIES.SWITCH);
+  assert.equal(onOff.type, DEVICE_FEATURE_TYPES.SWITCH.BINARY);
+  assert.equal(onOff.read_only, false);
+  assert.equal(onOff.has_feedback, true);
+
+  const state = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.STATE}`));
+  assert.equal(state.category, DEVICE_FEATURE_CATEGORIES.TEXT);
+  assert.equal(state.type, DEVICE_FEATURE_TYPES.TEXT.TEXT);
+  assert.equal(state.read_only, true);
+});
+
+test('the stats features are added only when the user asked for them', () => {
+  const withStats = buildContainerDevice(gladys, nginx, normalizeConfig({ collect_stats: true }));
+  const cpu = withStats.features.find((f) => f.external_id.endsWith(`:${FEATURE.CPU}`));
+  const memory = withStats.features.find((f) => f.external_id.endsWith(`:${FEATURE.MEMORY}`));
+  assert.equal(cpu.unit, DEVICE_FEATURE_UNITS.PERCENT);
+  assert.ok(cpu.max > 100, 'a container can use more than one core');
+  assert.equal(memory.category, DEVICE_FEATURE_CATEGORIES.DATA);
+  assert.equal(memory.type, DEVICE_FEATURE_TYPES.DATA.SIZE);
+  assert.equal(memory.unit, DEVICE_FEATURE_UNITS.MEGABYTE);
+
+  const without = buildContainerDevice(gladys, nginx, normalizeConfig({ collect_stats: false }));
+  assert.equal(without.features.length, 2);
+});
+
+test('feature external ids are unique inside a device', () => {
+  const device = buildContainerDevice(gladys, nginx, config);
+  const ids = device.features.map((f) => f.external_id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test('the device exposes the image and the compose origin as params', () => {
+  const container = normalizeContainer(
+    rawContainer({
+      Labels: { 'com.docker.compose.project': 'media', 'com.docker.compose.service': 'plex' },
+    }),
+  );
+  const params = Object.fromEntries(
+    buildContainerDevice(gladys, container, config).params.map((p) => [p.name, p.value]),
+  );
+  assert.equal(params.DOCKER_IMAGE, 'nginx:1.27');
+  assert.equal(params.DOCKER_CONTAINER_NAME, 'nginx');
+  assert.equal(params.DOCKER_COMPOSE_PROJECT, 'media');
+  assert.equal(params.DOCKER_COMPOSE_SERVICE, 'plex');
+});
+
+test('a standalone container declares no compose params', () => {
+  const names = buildContainerDevice(gladys, nginx, config).params.map((p) => p.name);
+  assert.ok(!names.includes('DOCKER_COMPOSE_PROJECT'));
+});
+
+test('buildContainerStates publishes the on/off and the state text', () => {
+  const states = buildContainerStates(gladys, nginx);
+  assert.deepEqual(states[0], {
+    device_feature_external_id: 'ext:docker:container:nginx:on-off',
+    state: 1,
+  });
+  assert.deepEqual(states[1], {
+    device_feature_external_id: 'ext:docker:container:nginx:state',
+    text: 'running',
+  });
+  assert.equal(states.length, 2, 'no stats were provided, none are published');
+});
+
+test('a stopped container publishes 0 and its Docker state', () => {
+  const stopped = normalizeContainer(rawContainer({ State: 'exited', Status: 'Exited (0)' }));
+  const states = buildContainerStates(gladys, stopped);
+  assert.equal(states[0].state, 0);
+  assert.equal(states[1].text, 'exited');
+});
+
+test('unreadable stats are left out instead of being published as 0', () => {
+  const states = buildContainerStates(gladys, nginx, { cpuPercent: null, memoryMb: null });
+  assert.equal(states.length, 2);
+
+  const withStats = buildContainerStates(gladys, nginx, { cpuPercent: 0, memoryMb: 12.5 });
+  assert.equal(withStats.length, 4, 'a genuine 0% is a value, and is published');
+  assert.equal(withStats[2].state, 0);
+  assert.equal(withStats[3].state, 12.5);
+});
