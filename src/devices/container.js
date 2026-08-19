@@ -72,6 +72,11 @@ export function buildContainerDevice(gladys, container, config) {
       external_id: ids.feature(FEATURE.ON_OFF),
       category: DEVICE_FEATURE_CATEGORIES.SWITCH,
       type: DEVICE_FEATURE_TYPES.SWITCH.BINARY,
+      // min and max are NOT optional, on any feature, even a binary one:
+      // t_device_feature declares both NOT NULL, so a feature without them is
+      // published fine and then refused when the user adds the device.
+      min: 0,
+      max: 1,
       read_only: false, // actuator: starts and stops the container
       has_feedback: true, // we re-read the daemon after the command
       keep_history: true,
@@ -81,9 +86,15 @@ export function buildContainerDevice(gladys, container, config) {
       external_id: ids.feature(FEATURE.STATE),
       category: DEVICE_FEATURE_CATEGORIES.TEXT,
       type: DEVICE_FEATURE_TYPES.TEXT.TEXT,
+      // A text feature has no numeric range, but the columns are still NOT
+      // NULL: 0/0 is the pair Gladys itself assigns to a text/text feature.
+      min: 0,
+      max: 0,
       read_only: true,
       has_feedback: false,
-      keep_history: true,
+      // Same reason Gladys defaults text features to no history: a string is
+      // not aggregatable, and the On/Off feature already keeps the timeline.
+      keep_history: false,
     },
   ];
 

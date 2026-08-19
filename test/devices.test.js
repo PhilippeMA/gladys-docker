@@ -16,6 +16,7 @@ import { normalizeContainer } from '../src/docker/containers.js';
 import { normalizeConfig } from '../src/config.js';
 import { createFakeGladys } from './helpers/fakeGladys.js';
 import { rawContainer } from './helpers/fakeDocker.js';
+import { assertGladysAcceptsDevices } from './helpers/gladysContract.js';
 
 const gladys = createFakeGladys();
 const config = normalizeConfig({ docker_api_url: 'http://docker.test:2375' });
@@ -135,4 +136,25 @@ test('unreadable stats are left out instead of being published as 0', () => {
   assert.equal(withStats.length, 4, 'a genuine 0% is a value, and is published');
   assert.equal(withStats[2].state, 0);
   assert.equal(withStats[3].state, 12.5);
+});
+
+test('every feature declares the min and max Gladys stores as NOT NULL', () => {
+  // Discovery accepts a feature without them; creating the device does not,
+  // so the failure would land on the user at "add device" time.
+  for (const collect_stats of [true, false]) {
+    const device = buildContainerDevice(gladys, nginx, normalizeConfig({ collect_stats }));
+    assertGladysAcceptsDevices([device]);
+  }
+});
+
+test('the binary and text features use the ranges Gladys assigns to them', () => {
+  const device = buildContainerDevice(gladys, nginx, config);
+  const onOff = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.ON_OFF}`));
+  const state = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.STATE}`));
+
+  assert.deepEqual([onOff.min, onOff.max], [0, 1], 'a binary switch spans 0..1');
+  assert.deepEqual([state.min, state.max], [0, 0], 'a text feature has no numeric range');
+  // A string is not aggregatable, and the On/Off feature already records the
+  // running / not-running timeline.
+  assert.equal(state.keep_history, false);
 });
