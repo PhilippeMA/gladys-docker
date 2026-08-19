@@ -45,6 +45,11 @@ test('a standalone container keeps its own name', () => {
   assert.equal(containerDeviceName(nginx), 'nginx');
 });
 
+test('the poll frequency is passed to Gladys in the milliseconds it expects', () => {
+  const device = buildContainerDevice(gladys, nginx, normalizeConfig({ poll_frequency: 30_000 }));
+  assert.equal(device.poll_frequency, 30_000);
+});
+
 test('a container device carries a controllable On/Off and a read-only state', () => {
   const device = buildContainerDevice(gladys, nginx, config);
   assert.equal(device.external_id, 'ext:docker:container:nginx');

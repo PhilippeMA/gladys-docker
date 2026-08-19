@@ -10,6 +10,13 @@
 // arrived as a string from the form.
 // -----------------------------------------------------------------------------
 
+// The poll frequencies Gladys accepts on a device, in MILLISECONDS. This is a
+// closed list mirroring DEVICE_POLL_FREQUENCIES in the Gladys core: anything
+// else is refused outright, with the whole discovery payload, when the devices
+// are published. Note the ceiling — one minute is as slow as a device can be
+// polled — and the unit: a value in seconds looks reasonable and is invalid.
+export const GLADYS_POLL_FREQUENCIES = [1000, 2000, 10000, 15000, 30000, 60000];
+
 // Defaults: they MUST stay consistent with the `default` values declared in the
 // `config_schema` of the manifest (a unit test enforces it).
 export const DEFAULT_CONFIG = {
@@ -23,7 +30,7 @@ export const DEFAULT_CONFIG = {
   exclude_filter: 'gladys*',
   include_stopped: true,
   collect_stats: true,
-  poll_frequency: 60, // seconds, state + sensors of one container
+  poll_frequency: 60_000, // milliseconds, state + sensors of one container
   discovery_frequency: 300, // seconds, re-read of the container list
   stop_timeout: 10, // seconds Docker waits before killing a container
 };
@@ -63,6 +70,20 @@ function toNumber(value, fallback, min, max) {
 }
 
 /**
+ * Read the device poll frequency, which Gladys only accepts as one of a closed
+ * list of millisecond values. A value outside the list falls back to the
+ * default instead of being forwarded: Gladys rejects the ENTIRE discovery
+ * payload over one bad frequency, so a single odd value would cost every
+ * device of the integration.
+ * @param {unknown} value - Raw value, a string when it comes from the form.
+ * @returns {number} A frequency Gladys accepts, in milliseconds.
+ */
+function toPollFrequency(value) {
+  const parsed = Number(value);
+  return GLADYS_POLL_FREQUENCIES.includes(parsed) ? parsed : DEFAULT_CONFIG.poll_frequency;
+}
+
+/**
  * Merge the user configuration with the defaults and force the types.
  * @param {Record<string, unknown>} raw - Configuration returned by the SDK.
  * @returns {Record<string, unknown>} Normalized configuration.
@@ -77,7 +98,7 @@ export function normalizeConfig(raw = {}) {
     exclude_filter: String(raw.exclude_filter ?? DEFAULT_CONFIG.exclude_filter),
     include_stopped: toBoolean(raw.include_stopped, DEFAULT_CONFIG.include_stopped),
     collect_stats: toBoolean(raw.collect_stats, DEFAULT_CONFIG.collect_stats),
-    poll_frequency: toNumber(raw.poll_frequency, DEFAULT_CONFIG.poll_frequency, 30, 3600),
+    poll_frequency: toPollFrequency(raw.poll_frequency),
     discovery_frequency: toNumber(
       raw.discovery_frequency,
       DEFAULT_CONFIG.discovery_frequency,

@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEVICE_TRANSPORTS } from '@gladysassistant/integration-sdk';
 import { createRegistry, LIST_CACHE_TTL_MS } from '../src/registry.js';
-import { normalizeConfig } from '../src/config.js';
+import { GLADYS_POLL_FREQUENCIES, normalizeConfig } from '../src/config.js';
 import { createFakeGladys } from './helpers/fakeGladys.js';
 import { createFakeDockerClient, rawContainer } from './helpers/fakeDocker.js';
+import { assertGladysAcceptsDevices } from './helpers/gladysContract.js';
 
 /**
  * Build a registry wired to a fake daemon.
@@ -148,4 +149,40 @@ test('when the daemon goes away every known device is reported unreachable', asy
   assert.deepEqual(registry.buildTransportEntries(), [
     { external_id: 'ext:docker:container:nginx', transport: DEVICE_TRANSPORTS.UNREACHABLE },
   ]);
+});
+
+test('the published payload satisfies the contract the Gladys core enforces', async () => {
+  const { registry } = createRig({
+    containers: [
+      rawContainer({ Names: ['/nginx'] }),
+      rawContainer({ Id: '2', Names: ['/backup'], State: 'exited', Status: 'Exited (0)' }),
+      rawContainer({
+        Id: '3',
+        Names: ['/media-plex-1'],
+        Labels: { 'com.docker.compose.project': 'media', 'com.docker.compose.service': 'plex' },
+      }),
+    ],
+  });
+  await registry.list(config);
+
+  // The core validates the WHOLE list and rejects all of it on the first bad
+  // field — one wrong value costs every device. Check both shapes of the
+  // payload, with and without the optional stats features.
+  assertGladysAcceptsDevices(registry.buildDiscoveredDevices(config));
+  assertGladysAcceptsDevices(
+    registry.buildDiscoveredDevices(normalizeConfig({ ...config, collect_stats: false })),
+  );
+});
+
+test('every offered refresh interval produces a payload Gladys accepts', async () => {
+  const { registry } = createRig({ containers: [rawContainer()] });
+  await registry.list(config);
+
+  for (const frequency of GLADYS_POLL_FREQUENCIES) {
+    const devices = registry.buildDiscoveredDevices(
+      normalizeConfig({ ...config, poll_frequency: frequency }),
+    );
+    assertGladysAcceptsDevices(devices);
+    assert.equal(devices[0].poll_frequency, frequency);
+  }
 });

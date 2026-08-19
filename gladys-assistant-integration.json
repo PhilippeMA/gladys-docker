@@ -16,7 +16,10 @@
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Before you start", "fr": "Avant de commencer" },
+      "label": {
+        "en": "Before you start",
+        "fr": "Avant de commencer"
+      },
       "description": {
         "en": "This integration runs in a sandboxed container that cannot mount the Docker socket of your host. It talks to the Docker Engine API over the network instead: expose it with a read-limited socket proxy (recommended) and paste its address below. The full step-by-step is in the documentation.",
         "fr": "Cette intégration tourne dans un conteneur isolé qui ne peut pas monter la socket Docker de votre hôte. Elle dialogue avec l'API Docker Engine via le réseau : exposez-la avec un proxy de socket à droits limités (recommandé) et collez son adresse ci-dessous. La procédure complète est dans la documentation."
@@ -24,23 +27,35 @@
       "links": [
         {
           "url": "https://github.com/Tecnativa/docker-socket-proxy",
-          "label": { "en": "Docker socket proxy", "fr": "Proxy de socket Docker" }
+          "label": {
+            "en": "Docker socket proxy",
+            "fr": "Proxy de socket Docker"
+          }
         },
         {
           "url": "https://docs.docker.com/reference/api/engine/",
-          "label": { "en": "Docker Engine API", "fr": "API Docker Engine" }
+          "label": {
+            "en": "Docker Engine API",
+            "fr": "API Docker Engine"
+          }
         }
       ]
     },
     {
       "key": "docker_api_url",
       "type": "string",
-      "label": { "en": "Docker API address", "fr": "Adresse de l'API Docker" },
+      "label": {
+        "en": "Docker API address",
+        "fr": "Adresse de l'API Docker"
+      },
       "description": {
         "en": "Address of the Docker Engine API, for example http://192.168.1.10:2375. https:// is supported.",
         "fr": "Adresse de l'API Docker Engine, par exemple http://192.168.1.10:2375. https:// est supporté."
       },
-      "placeholder": { "en": "http://192.168.1.10:2375", "fr": "http://192.168.1.10:2375" },
+      "placeholder": {
+        "en": "http://192.168.1.10:2375",
+        "fr": "http://192.168.1.10:2375"
+      },
       "required": true
     },
     {
@@ -60,31 +75,46 @@
     {
       "key": "name_filter",
       "type": "string",
-      "label": { "en": "Containers to include", "fr": "Conteneurs à inclure" },
+      "label": {
+        "en": "Containers to include",
+        "fr": "Conteneurs à inclure"
+      },
       "description": {
         "en": "Comma-separated container names, * allowed (e.g. media-*, nginx). Leave empty to expose every container.",
         "fr": "Noms de conteneurs séparés par des virgules, * autorisé (ex. media-*, nginx). Laissez vide pour exposer tous les conteneurs."
       },
-      "placeholder": { "en": "media-*, nginx", "fr": "media-*, nginx" },
+      "placeholder": {
+        "en": "media-*, nginx",
+        "fr": "media-*, nginx"
+      },
       "required": false,
       "default": ""
     },
     {
       "key": "exclude_filter",
       "type": "string",
-      "label": { "en": "Containers to exclude", "fr": "Conteneurs à exclure" },
+      "label": {
+        "en": "Containers to exclude",
+        "fr": "Conteneurs à exclure"
+      },
       "description": {
         "en": "Comma-separated container names, * allowed. Applied after the inclusion list — keep your Gladys containers here.",
         "fr": "Noms de conteneurs séparés par des virgules, * autorisé. Appliqué après la liste d'inclusion — gardez-y vos conteneurs Gladys."
       },
-      "placeholder": { "en": "gladys*, *-db", "fr": "gladys*, *-db" },
+      "placeholder": {
+        "en": "gladys*, *-db",
+        "fr": "gladys*, *-db"
+      },
       "required": false,
       "default": "gladys*"
     },
     {
       "key": "include_stopped",
       "type": "boolean",
-      "label": { "en": "Offer stopped containers", "fr": "Proposer les conteneurs arrêtés" },
+      "label": {
+        "en": "Offer stopped containers",
+        "fr": "Proposer les conteneurs arrêtés"
+      },
       "description": {
         "en": "Also list the containers that are currently stopped in the Discovery tab.",
         "fr": "Lister aussi les conteneurs actuellement arrêtés dans l'onglet Découverte."
@@ -95,7 +125,10 @@
     {
       "key": "collect_stats",
       "type": "boolean",
-      "label": { "en": "Collect CPU and memory", "fr": "Collecter CPU et mémoire" },
+      "label": {
+        "en": "Collect CPU and memory",
+        "fr": "Collecter CPU et mémoire"
+      },
       "description": {
         "en": "Add a CPU and a memory sensor to each container. Costs about one second of daemon time per container and per refresh.",
         "fr": "Ajoute un capteur CPU et un capteur mémoire à chaque conteneur. Coûte environ une seconde de daemon par conteneur et par rafraîchissement."
@@ -105,24 +138,58 @@
     },
     {
       "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "type": "select",
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Intervalle de rafraîchissement"
+      },
       "description": {
-        "en": "How often the state and the sensors of each container are refreshed, in seconds.",
-        "fr": "Fréquence de rafraîchissement de l'état et des capteurs de chaque conteneur, en secondes."
+        "en": "How often the state and the sensors of each container are refreshed. Gladys polls no slower than once a minute. With CPU and memory collection on, each refresh costs about a second of daemon time per container: keep it slow if you manage many.",
+        "fr": "Fréquence de rafraîchissement de l'état et des capteurs de chaque conteneur. Gladys n'interroge pas plus lentement qu'une fois par minute. Avec la collecte CPU et mémoire, chaque rafraîchissement coûte environ une seconde de daemon par conteneur : gardez-le lent si vous en gérez beaucoup."
       },
       "required": false,
-      "default": 60,
-      "min": 30,
-      "max": 3600
+      "default": "60000",
+      "options": [
+        {
+          "value": "10000",
+          "label": {
+            "en": "Every 10 seconds",
+            "fr": "Toutes les 10 secondes"
+          }
+        },
+        {
+          "value": "15000",
+          "label": {
+            "en": "Every 15 seconds",
+            "fr": "Toutes les 15 secondes"
+          }
+        },
+        {
+          "value": "30000",
+          "label": {
+            "en": "Every 30 seconds",
+            "fr": "Toutes les 30 secondes"
+          }
+        },
+        {
+          "value": "60000",
+          "label": {
+            "en": "Every minute",
+            "fr": "Toutes les minutes"
+          }
+        }
+      ]
     },
     {
       "key": "discovery_frequency",
       "type": "number",
-      "label": { "en": "Discovery interval (s)", "fr": "Intervalle de découverte (s)" },
+      "label": {
+        "en": "Discovery interval (s)",
+        "fr": "Intervalle de découverte (s)"
+      },
       "description": {
-        "en": "How often the container list is re-read, so new containers show up on their own.",
-        "fr": "Fréquence de relecture de la liste des conteneurs, pour que les nouveaux apparaissent d'eux-mêmes."
+        "en": "How often the container list is re-read, so new containers show up on their own. Unrelated to the refresh interval above: this one is the integration’s own timer.",
+        "fr": "Fréquence de relecture de la liste des conteneurs, pour que les nouveaux apparaissent d'eux-mêmes. Sans rapport avec l'intervalle ci-dessus : c'est le minuteur propre à l'intégration."
       },
       "required": false,
       "default": 300,
@@ -132,7 +199,10 @@
     {
       "key": "stop_timeout",
       "type": "number",
-      "label": { "en": "Stop timeout (s)", "fr": "Délai d'arrêt (s)" },
+      "label": {
+        "en": "Stop timeout (s)",
+        "fr": "Délai d'arrêt (s)"
+      },
       "description": {
         "en": "Grace period Docker gives a container to exit before killing it.",
         "fr": "Délai laissé par Docker à un conteneur pour s'arrêter avant de le tuer."
@@ -146,7 +216,10 @@
   "actions": [
     {
       "key": "test_connection",
-      "label": { "en": "Test the Docker connection", "fr": "Tester la connexion Docker" },
+      "label": {
+        "en": "Test the Docker connection",
+        "fr": "Tester la connexion Docker"
+      },
       "description": {
         "en": "Contact the Docker daemon and report its version and how many containers match your filters.",
         "fr": "Contacte le daemon Docker et affiche sa version et le nombre de conteneurs correspondant à vos filtres."
@@ -167,7 +240,10 @@
     },
     {
       "key": "restart_container",
-      "label": { "en": "Restart a container", "fr": "Redémarrer un conteneur" },
+      "label": {
+        "en": "Restart a container",
+        "fr": "Redémarrer un conteneur"
+      },
       "description": {
         "en": "Pick one of your container devices and restart it.",
         "fr": "Choisissez un de vos conteneurs et redémarrez-le."
@@ -178,7 +254,10 @@
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Container", "fr": "Conteneur" },
+          "label": {
+            "en": "Container",
+            "fr": "Conteneur"
+          },
           "required": true
         }
       ]

@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_CONFIG } from '../src/config.js';
+import { DEFAULT_CONFIG, GLADYS_POLL_FREQUENCIES, normalizeConfig } from '../src/config.js';
 
 const manifest = JSON.parse(
   await readFile(new URL('../gladys-assistant-integration.json', import.meta.url), 'utf8'),
@@ -28,16 +28,16 @@ test('every manifest action has a registered handler', () => {
   }
 });
 
-test('config_schema defaults stay consistent with DEFAULT_CONFIG', () => {
-  for (const field of manifest.config_schema) {
-    if (field.default !== undefined) {
-      assert.equal(
-        DEFAULT_CONFIG[field.key],
-        field.default,
-        `DEFAULT_CONFIG.${field.key} must match the manifest default`,
-      );
-    }
-  }
+test('saving the form untouched gives the code exactly its own defaults', () => {
+  // Stronger than comparing raw values field by field: a `select` stores its
+  // option values as strings, so what matters is that the manifest defaults,
+  // once normalized, ARE the defaults the code assumes.
+  const asSubmitted = Object.fromEntries(
+    manifest.config_schema
+      .filter((field) => field.default !== undefined)
+      .map((field) => [field.key, field.default]),
+  );
+  assert.deepEqual(normalizeConfig(asSubmitted), DEFAULT_CONFIG);
 });
 
 test('every value-carrying config field is known to the code', () => {
@@ -65,6 +65,21 @@ test('the numeric bounds of the manifest match the clamping the code applies', (
       `${field.key} default out of range`,
     );
   }
+});
+
+test('the refresh interval only offers frequencies Gladys accepts', () => {
+  // Gladys validates poll_frequency against a closed list of MILLISECOND
+  // values and rejects the entire discovery payload when one is off. Offering
+  // a free number here is what let a seconds-shaped value through.
+  const field = manifest.config_schema.find((f) => f.key === 'poll_frequency');
+  assert.equal(field.type, 'select', 'a free number can express a frequency Gladys refuses');
+  for (const option of field.options) {
+    assert.ok(
+      GLADYS_POLL_FREQUENCIES.includes(Number(option.value)),
+      `option "${option.value}" is not a frequency Gladys accepts`,
+    );
+  }
+  assert.ok(field.options.some((option) => option.value === field.default));
 });
 
 test('declaring catalog categories requires Gladys >= 4.86.0', () => {

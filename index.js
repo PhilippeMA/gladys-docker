@@ -87,10 +87,11 @@ gladys.on('disconnected', () => {
  * Re-read the daemon, publish the containers it holds, refresh the transport
  * badges, and report the application-level connection status.
  *
- * Every failure ends here rather than propagating: an unreachable daemon is a
- * state to display in the Configuration screen, not a crash. It is also the
- * single place that calls setConnectionStatus, so the status shown always
- * matches the last thing we actually observed.
+ * NOTHING is allowed to escape this function. It is the only place that calls
+ * setConnectionStatus, so an exception thrown on the way out would leave the
+ * Configuration screen showing whatever it last displayed — an old failure
+ * message, long after the cause was fixed. Every path below therefore ends on
+ * a status: success, or a failure that says which half broke.
  * @returns {Promise<void>} Resolves once Gladys has been updated.
  */
 async function refreshDevices() {
@@ -105,22 +106,40 @@ async function refreshDevices() {
 
   try {
     await registry.list(config, { force: true });
-  } catch (err) {
-    logger.error(`Cannot read the container list: ${err.message}`);
-    // Devices already created keep existing; their badge turns unreachable.
+    const devices = registry.buildDiscoveredDevices(config);
+    logger.info(`Publishing ${devices.length} container device(s)`);
+    await gladys.publishDiscoveredDevices(devices);
     await publishTransports();
-    await reportStatus(false, {
-      en: `Cannot reach the Docker API: ${err.message}`.slice(0, 200),
-      fr: `Impossible de joindre l’API Docker : ${err.message}`.slice(0, 200),
-    });
-    return;
+    await reportStatus(true);
+  } catch (err) {
+    // Two very different failures land here, and telling them apart is the
+    // difference between "check your Docker setup" and "this is our bug":
+    // either the daemon did not answer, or Gladys refused what we published.
+    const daemonFailed = !registry.isReachable();
+    logger.error(
+      daemonFailed
+        ? `Cannot read the container list: ${err.message}`
+        : `Gladys refused the container devices: ${err.message}`,
+    );
+    // Devices already created keep existing; their badge turns unreachable
+    // when the daemon is the problem.
+    await publishTransports().catch(() => {});
+    await reportStatus(
+      false,
+      daemonFailed
+        ? {
+            en: `Cannot reach the Docker API: ${err.message}`.slice(0, 200),
+            fr: `Impossible de joindre l’API Docker : ${err.message}`.slice(0, 200),
+          }
+        : {
+            en: `Docker containers found, but Gladys refused them: ${err.message}`.slice(0, 200),
+            fr: `Conteneurs Docker trouvés, mais Gladys les a refusés : ${err.message}`.slice(
+              0,
+              200,
+            ),
+          },
+    );
   }
-
-  const devices = registry.buildDiscoveredDevices(config);
-  logger.info(`Publishing ${devices.length} container device(s)`);
-  await gladys.publishDiscoveredDevices(devices);
-  await publishTransports();
-  await reportStatus(true);
 }
 
 /**

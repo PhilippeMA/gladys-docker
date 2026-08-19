@@ -87,13 +87,13 @@ placez plutôt un proxy de socket devant lui.
 
 Les autres réglages :
 
-| Réglage                         | Ce qu'il change                                                                                                           |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Proposer les conteneurs arrêtés | Si les conteneurs actuellement arrêtés sont listés dans la Découverte.                                                    |
-| Collecter CPU et mémoire        | Ajoute un capteur CPU et un capteur mémoire à chaque conteneur. Coûte environ une seconde de daemon par rafraîchissement. |
-| Intervalle de rafraîchissement  | Fréquence de mise à jour de l'état et des capteurs d'un conteneur.                                                        |
-| Intervalle de découverte        | Fréquence de relecture de la liste, pour que les conteneurs créés ensuite apparaissent d'eux-mêmes.                       |
-| Délai d'arrêt                   | Le temps laissé par Docker à un conteneur pour s'arrêter avant de le tuer.                                                |
+| Réglage                         | Ce qu'il change                                                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Proposer les conteneurs arrêtés | Si les conteneurs actuellement arrêtés sont listés dans la Découverte.                                                                                                                            |
+| Collecter CPU et mémoire        | Ajoute un capteur CPU et un capteur mémoire à chaque conteneur. Coûte environ une seconde de daemon par rafraîchissement.                                                                         |
+| Intervalle de rafraîchissement  | Fréquence de mise à jour de l'état et des capteurs d'un conteneur. Gladys interroge un appareil au plus lentement une fois par minute : les choix vont de 10 secondes à 1 minute.                 |
+| Intervalle de découverte        | Fréquence de relecture de la liste, pour que les conteneurs créés ensuite apparaissent d'eux-mêmes. C'est le minuteur propre à l'intégration, sans rapport avec l'intervalle de rafraîchissement. |
+| Délai d'arrêt                   | Le temps laissé par Docker à un conteneur pour s'arrêter avant de le tuer.                                                                                                                        |
 
 ## À quoi ressemble un conteneur dans Gladys
 
@@ -137,6 +137,11 @@ joignable.
 - **L'état publié est celui du daemon, pas celui demandé.** Démarrez un
   conteneur qui plante au lancement et l'interrupteur revient sur off, parce que
   c'est ce que Docker rapporte.
+- **Collecter CPU et mémoire n'est pas gratuit.** Docker met environ une seconde
+  à répondre à une demande de statistiques, par conteneur. Avec vingt conteneurs
+  rafraîchis toutes les 10 secondes, le daemon passe plus de temps à répondre
+  qu'au repos : laissez l'intervalle sur une minute sauf si vous avez peu de
+  conteneurs, ou désactivez les statistiques.
 
 ## En cas de problème
 

@@ -80,13 +80,13 @@ front of it instead.
 
 The other settings:
 
-| Setting                  | What it changes                                                                                    |
-| ------------------------ | -------------------------------------------------------------------------------------------------- |
-| Offer stopped containers | Whether containers that are currently stopped are listed in Discovery.                             |
-| Collect CPU and memory   | Adds a CPU and a memory sensor to each container. Costs about a second of daemon time per refresh. |
-| Refresh interval         | How often the state and the sensors of a container are refreshed.                                  |
-| Discovery interval       | How often the container list is re-read, so containers created later appear on their own.          |
-| Stop timeout             | The grace period Docker gives a container to exit before killing it.                               |
+| Setting                  | What it changes                                                                                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Offer stopped containers | Whether containers that are currently stopped are listed in Discovery.                                                                                                |
+| Collect CPU and memory   | Adds a CPU and a memory sensor to each container. Costs about a second of daemon time per refresh.                                                                    |
+| Refresh interval         | How often the state and the sensors of a container are refreshed. Gladys polls a device once a minute at the slowest, so the choices run from 10 seconds to 1 minute. |
+| Discovery interval       | How often the container list is re-read, so containers created later appear on their own. This is the integration's own timer, unrelated to the refresh interval.     |
+| Stop timeout             | The grace period Docker gives a container to exit before killing it.                                                                                                  |
 
 ## What each container looks like in Gladys
 
@@ -128,6 +128,11 @@ attention — restarting in a loop, paused, dead, or failing its own health chec
 - **The state published is the daemon's, not the request's.** Start a container
   that crashes on boot and the switch goes back to off, because that is what
   Docker reports.
+- **Collecting CPU and memory is not free.** Docker needs about a second to
+  answer a stats request, per container. With twenty containers refreshed every
+  10 seconds, the daemon spends more time answering than idling: leave the
+  refresh interval at one minute unless you have few containers, or turn the
+  stats off.
 
 ## Troubleshooting
 
