@@ -1,6 +1,6 @@
 {
   "name": "gladys-docker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Gladys Assistant external integration to manage Docker containers (start, stop, restart, monitor).",
   "type": "module",
