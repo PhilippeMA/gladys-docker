@@ -6,8 +6,8 @@
     "en": "Start, stop, restart and monitor the Docker containers of your server.",
     "fr": "Démarrez, arrêtez, redémarrez et surveillez les conteneurs Docker de votre serveur."
   },
-  "version": "1.0.1",
-  "docker_image": "ghcr.io/philippema/gladys-docker:1.0.1",
+  "version": "1.0.2",
+  "docker_image": "ghcr.io/philippema/gladys-docker:1.0.2",
   "gladys_version": ">=4.86.0",
   "cover_image": "https://raw.githubusercontent.com/PhilippeMA/gladys-docker/main/cover.png",
   "categories": ["services", "network"],
