@@ -169,17 +169,23 @@ export function buildContainerDevice(gladys, container, config) {
     },
   ];
 
+  // Both stats features deliberately share the `decimal` type. Gladys labels a
+  // row with the integration's own feature name ONLY when another feature of
+  // the same device carries the same type (shouldDisplayDeviceName); otherwise
+  // it uses the i18n wording of the category, which for a borrowed category is
+  // the wrong word entirely. Two decimals is what turns "Temperature" into
+  // "CPU" and "Size" into "Memory". Give one of them a unique type again and
+  // both labels revert — a test pins this.
   if (config.collect_stats) {
     features.push(
       {
         name: 'CPU',
         external_id: ids.feature(FEATURE.CPU),
-        // Gladys has no CPU category. `unknown` is the honest one, but the UI
-        // has neither an icon nor a label for unknown/decimal, so the row
-        // rendered blank. `device-temperature-sensor` is borrowed purely for
-        // its presentation — it is the pair whose icon is a processor chip.
-        // The cost is the row label, which reads "Temperature"; the value and
-        // its percent unit are published and displayed correctly.
+        // Gladys has no CPU category, so this one is borrowed purely for its
+        // icon: `device-temperature-sensor`/`decimal` is the pair the UI draws
+        // with a processor chip. The category's own label ("Temperature")
+        // never shows, because CPU and Memory share the `decimal` type —
+        // see the note above the stats block.
         category: DEVICE_FEATURE_CATEGORIES.DEVICE_TEMPERATURE_SENSOR,
         type: DEVICE_FEATURE_TYPES.SENSOR.DECIMAL,
         unit: DEVICE_FEATURE_UNITS.PERCENT,
@@ -194,8 +200,12 @@ export function buildContainerDevice(gladys, container, config) {
       {
         name: 'Memory',
         external_id: ids.feature(FEATURE.MEMORY),
-        category: DEVICE_FEATURE_CATEGORIES.DATA,
-        type: DEVICE_FEATURE_TYPES.DATA.SIZE,
+        // Borrowed for its icon too, and — just as importantly — for its
+        // `decimal` type: sharing it with CPU is what makes Gladys label both
+        // rows with the names above. `data`/`size` drew a nicer disk icon, but
+        // its type is unique, which left CPU labelled "Temperature".
+        category: DEVICE_FEATURE_CATEGORIES.VOLUME_SENSOR,
+        type: DEVICE_FEATURE_TYPES.SENSOR.DECIMAL,
         unit: DEVICE_FEATURE_UNITS.MEGABYTE,
         min: 0,
         max: 131072,

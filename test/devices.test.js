@@ -117,8 +117,6 @@ test('the stats features are added only when the user asked for them', () => {
   const memory = withStats.features.find((f) => f.external_id.endsWith(`:${FEATURE.MEMORY}`));
   assert.equal(cpu.unit, DEVICE_FEATURE_UNITS.PERCENT);
   assert.ok(cpu.max > 100, 'a container can use more than one core');
-  assert.equal(memory.category, DEVICE_FEATURE_CATEGORIES.DATA);
-  assert.equal(memory.type, DEVICE_FEATURE_TYPES.DATA.SIZE);
   assert.equal(memory.unit, DEVICE_FEATURE_UNITS.MEGABYTE);
 
   const withoutStats = buildContainerDevice(
@@ -215,4 +213,32 @@ test('a polled device asks Gladys to actually poll it', () => {
   const device = buildContainerDevice(gladys, nginx, config);
   assert.equal(device.should_poll, true);
   assert.equal(device.poll_frequency, config.poll_frequency);
+});
+
+test('CPU and Memory share the decimal type, which is what names their rows', () => {
+  // Gladys shows the name an integration gave a feature ONLY when a sibling
+  // feature carries the same type; otherwise it prints the i18n wording of the
+  // category, which for a borrowed category is the wrong word. Give either of
+  // these a unique type again and the rows revert to "Temperature" and "Size".
+  const device = buildContainerDevice(gladys, nginx, config);
+  const cpu = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.CPU}`));
+  const memory = device.features.find((f) => f.external_id.endsWith(`:${FEATURE.MEMORY}`));
+
+  assert.equal(cpu.type, DEVICE_FEATURE_TYPES.SENSOR.DECIMAL);
+  assert.equal(memory.type, cpu.type, 'a shared type is what makes Gladys use our names');
+  assert.equal(cpu.name, 'CPU');
+  assert.equal(memory.name, 'Memory');
+
+  // The categories differ: each is borrowed for its icon alone.
+  assert.equal(cpu.category, DEVICE_FEATURE_CATEGORIES.DEVICE_TEMPERATURE_SENSOR);
+  assert.notEqual(memory.category, cpu.category);
+});
+
+test('the push buttons rely on the same rule to show their own names', () => {
+  const device = buildContainerDevice(gladys, nginx, config);
+  const pushTypes = device.features
+    .filter((f) => f.type === DEVICE_FEATURE_TYPES.BUTTON.PUSH)
+    .map((f) => f.name);
+  assert.deepEqual(pushTypes, ['Start', 'Stop', 'Restart']);
+  assert.ok(pushTypes.length > 1, 'a lone push button would be labelled "Push button"');
 });

@@ -103,12 +103,11 @@ Containers created by Docker Compose are named `project · service`; the others
 keep their container name. The device page also shows the image the container
 runs and, for a Compose container, its project and service.
 
-Two labels come from Gladys, not from this integration. The CPU row reads
-**"Temperature"**: Gladys has no CPU category, so the feature borrows the one
-whose icon is a processor chip — the value and its percent unit are correct,
-only the wording is not. The Running row reads **"Switch"** for the same
-reason. Both can be renamed for good in a dashboard, from the pencil icon of
-the "Devices in room" box.
+One label comes from Gladys rather than from this integration: the Running row
+reads **"Switch"**. Gladys names a row after the feature's category unless
+another feature of the device shares its type, and Running is the only binary
+one. It can be renamed for good in a dashboard, from the pencil icon of the
+"Devices in room" box.
 
 A device carries a **local** badge, which turns orange when the container needs
 attention — restarting in a loop, paused, dead, or failing its own health check

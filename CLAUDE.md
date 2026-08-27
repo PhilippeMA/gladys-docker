@@ -99,6 +99,12 @@ Check both maps before choosing a pair. `unknown`/`decimal` exists server-side
 and renders blank, which is how the CPU feature shipped without an icon or a
 label.
 
+Those two rules combine into the trick this integration relies on: borrow a
+category for its **icon**, then give a sibling feature the **same type** so the
+borrowed category's wrong label never shows. CPU and Memory are both `decimal`
+for exactly that reason, as are the three `push` buttons. Give either stats
+feature a unique type again and both rows revert to the category wording.
+
 `read_only` decides the whole widget: `true` routes to the sensor renderer
 (a badge), `false` to a control — a toggle, a push button, a select.
 

@@ -110,13 +110,11 @@ Les conteneurs créés par Docker Compose sont nommés `projet · service` ; les
 autres gardent leur nom de conteneur. La page de l'appareil affiche aussi
 l'image utilisée et, pour un conteneur Compose, son projet et son service.
 
-Deux libellés viennent de Gladys et non de cette intégration. La ligne CPU
-s'intitule **« Température »** : Gladys n'a aucune catégorie CPU, la
-fonctionnalité emprunte donc celle dont l'icône est une puce de processeur — la
-valeur et son unité en pourcentage sont justes, seul le mot ne l'est pas. La
-ligne Running s'intitule **« Commutateur »** pour la même raison. Les deux se
-renomment définitivement dans un tableau de bord, via le crayon du bloc
-« Appareils d'une pièce ».
+Un libellé vient de Gladys et non de cette intégration : la ligne Running
+s'intitule **« Commutateur »**. Gladys nomme une ligne d'après la catégorie de
+la fonctionnalité, sauf si une autre fonctionnalité de l'appareil partage son
+type — et Running est la seule binaire. Elle se renomme définitivement dans un
+tableau de bord, via le crayon du bloc « Appareils d'une pièce ».
 
 Chaque appareil porte un badge **local**, qui passe à l'orange quand le
 conteneur mérite un coup d'œil — redémarrages en boucle, en pause, mort, ou en
