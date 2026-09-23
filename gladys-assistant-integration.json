@@ -8,7 +8,7 @@
   },
   "version": "1.0.2",
   "docker_image": "ghcr.io/philippema/gladys-docker:1.0.2",
-  "gladys_version": ">=4.86.0",
+  "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/PhilippeMA/gladys-docker/main/cover.png",
   "categories": ["services", "network"],
   "transports": ["local"],
@@ -250,6 +250,102 @@
       },
       "timeout_seconds": 120,
       "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Container",
+            "fr": "Conteneur"
+          },
+          "required": true
+        }
+      ]
+    }
+  ],
+  "widgets": [
+    {
+      "key": "containers",
+      "label": {
+        "en": "Docker containers",
+        "fr": "Conteneurs Docker"
+      },
+      "description": {
+        "en": "Every container at a glance: state, CPU and memory, with the totals.",
+        "fr": "Tous les conteneurs d'un coup d'œil : état, CPU et mémoire, avec les totaux."
+      },
+      "icon": "box",
+      "action_timeout_seconds": 120,
+      "settings": [
+        {
+          "key": "containers",
+          "type": "multi_select",
+          "source": "devices",
+          "label": {
+            "en": "Containers to list",
+            "fr": "Conteneurs à lister"
+          },
+          "description": {
+            "en": "Leave empty to list every container the integration manages.",
+            "fr": "Laissez vide pour lister tous les conteneurs gérés par l'intégration."
+          },
+          "required": false
+        },
+        {
+          "key": "sort",
+          "type": "select",
+          "label": {
+            "en": "Order",
+            "fr": "Tri"
+          },
+          "required": false,
+          "default": "state",
+          "options": [
+            {
+              "value": "state",
+              "label": {
+                "en": "Anything wrong first",
+                "fr": "Ce qui cloche d'abord"
+              }
+            },
+            {
+              "value": "name",
+              "label": {
+                "en": "By name",
+                "fr": "Par nom"
+              }
+            },
+            {
+              "value": "cpu",
+              "label": {
+                "en": "Busiest CPU first",
+                "fr": "CPU le plus chargé"
+              }
+            },
+            {
+              "value": "memory",
+              "label": {
+                "en": "Largest memory first",
+                "fr": "Mémoire la plus grosse"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "container",
+      "label": {
+        "en": "Docker container",
+        "fr": "Conteneur Docker"
+      },
+      "description": {
+        "en": "One container: its state, CPU and memory, and buttons to start, stop or restart it.",
+        "fr": "Un conteneur : état, CPU, mémoire, et les boutons pour le démarrer, l'arrêter ou le redémarrer."
+      },
+      "icon": "server",
+      "action_timeout_seconds": 120,
+      "settings": [
         {
           "key": "device",
           "type": "select",
