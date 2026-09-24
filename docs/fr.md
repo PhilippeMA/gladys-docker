@@ -3,7 +3,8 @@
 Gérez les conteneurs Docker de votre serveur depuis Gladys : voyez s'ils
 tournent, démarrez-les et arrêtez-les depuis un tableau de bord ou une scène,
 redémarrez-les depuis l'écran de configuration, et suivez leur consommation
-CPU et mémoire.
+CPU et mémoire. Deux widgets de tableau de bord donnent une vue d'ensemble du
+parc et une carte de pilotage par conteneur.
 
 ## Comment l'intégration joint Docker
 
@@ -120,6 +121,31 @@ Chaque appareil porte un badge **local**, qui passe à l'orange quand le
 conteneur mérite un coup d'œil — redémarrages en boucle, en pause, mort, ou en
 échec de son propre health check — et au gris quand le daemon n'est plus
 joignable.
+
+## Widgets de tableau de bord
+
+Deux cartes sont proposées dans le sélecteur de widgets (**Gladys 5.1 ou
+supérieur**).
+
+**Conteneurs Docker** — la vue d'ensemble. Cinq tuiles comptent ce qui tourne et
+additionnent CPU et mémoire, puis une ligne par conteneur avec son état, son CPU
+et sa mémoire. Par défaut, ce qui mérite un coup d'œil remonte en tête : un
+conteneur qui redémarre en boucle ne se retrouve jamais sous dix conteneurs
+sains. Deux réglages : quels conteneurs lister (vide = tous) et le tri. La liste
+affiche dix lignes au maximum ; au-delà, la dernière indique combien sont
+masqués. Quand un seul conteneur est en difficulté, la carte propose un bouton
+pour le redémarrer — avec confirmation.
+
+**Conteneur Docker** — un conteneur, avec ses commandes. Choisissez-le dans les
+réglages du widget : la carte affiche les tuiles CPU et mémoire en temps réel,
+son état, son image et son origine Compose, plus les boutons **Démarrer**,
+**Arrêter** et **Redémarrer**. Les tuiles et les boutons sont reliés à l'appareil
+lui-même : ils se mettent à jour seuls, et un appui se comporte exactement comme
+sur la page de l'appareil.
+
+Ajoutez plusieurs instances du second widget pour piloter plusieurs conteneurs :
+une carte de tableau de bord ne peut pas porter un bouton par ligne, et c'est la
+raison pour laquelle les deux widgets sont séparés.
 
 ## Actions
 

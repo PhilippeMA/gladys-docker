@@ -140,3 +140,50 @@ test('the integration declares a single, local transport', () => {
   // there is no cloud channel, hence no "prefer local" toggle to render.
   assert.deepEqual(manifest.transports, ['local']);
 });
+
+test('every declared widget has a registered handler', () => {
+  for (const widget of manifest.widgets ?? []) {
+    assert.ok(entryPoint.includes(`gladys.onWidgetGet(`), 'index.js must register widget handlers');
+    assert.match(widget.key, /^[a-z0-9_]{2,32}$/, `widget "${widget.key}" has an invalid key`);
+    assert.ok(widget.label?.en, `widget "${widget.key}" needs an English label`);
+  }
+});
+
+test('declaring widgets requires Gladys >= 5.1.0', () => {
+  // The first release accepting the `widgets` manifest field; older cores
+  // reject any unknown top-level field at install time, so claiming a lower
+  // minimum turns a clear catalog filter into a cryptic install failure.
+  assert.ok(Array.isArray(manifest.widgets) && manifest.widgets.length > 0);
+  const minVersion = manifest.gladys_version.match(/>=\s*(\d+)\.(\d+)\.\d+/);
+  assert.ok(minVersion, 'gladys_version must declare a minimum version');
+  const [, major, minor] = minVersion.map(Number);
+  assert.ok(
+    major > 5 || (major === 5 && minor >= 1),
+    `widgets require gladys_version >= 5.1.0, got "${manifest.gladys_version}"`,
+  );
+});
+
+test('widget settings stay within the types a dashboard may carry', () => {
+  // secret / oauth2 / account_link are refused: a dashboard JSON is readable
+  // by every user of a public dashboard.
+  const allowed = new Set(['string', 'number', 'boolean', 'select', 'multi_select', 'section']);
+  for (const widget of manifest.widgets ?? []) {
+    const keys = new Set();
+    for (const field of widget.settings ?? []) {
+      assert.ok(
+        allowed.has(field.type),
+        `${widget.key}.${field.key}: type "${field.type}" is refused`,
+      );
+      assert.ok(!keys.has(field.key), `${widget.key}: duplicate setting "${field.key}"`);
+      keys.add(field.key);
+      if (field.source !== undefined) {
+        assert.equal(field.source, 'devices');
+        assert.equal(field.options, undefined, 'source and options are mutually exclusive');
+      }
+    }
+  }
+});
+
+test('the widget action of the overview is handled', () => {
+  assert.ok(entryPoint.includes('gladys.onWidgetAction('), 'the restart button needs a handler');
+});

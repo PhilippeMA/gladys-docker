@@ -20,6 +20,14 @@ import { isConfigured, normalizeConfig } from './src/config.js';
 import { createRegistry } from './src/registry.js';
 import { pollContainerDevice, setContainerValue } from './src/commands.js';
 import { listMatchingContainers, restartChosenContainer, testConnection } from './src/actions.js';
+import { FEATURE } from './src/devices/container.js';
+import {
+  buildContainersContent,
+  KEY as CONTAINERS_WIDGET,
+  RESTART_ACTION,
+} from './src/widgets/containersWidget.js';
+import { buildContainerContent, KEY as CONTAINER_WIDGET } from './src/widgets/containerWidget.js';
+import { restartedMessage } from './src/widgets/i18n.js';
 
 const gladys = new GladysIntegration();
 const registry = createRegistry(gladys);
@@ -43,7 +51,7 @@ gladys.onSetValue(async (device, feature, value) => {
   await setContainerValue(gladys, registry, config, { device, feature, value });
   // The action select only offers the orders that make sense for the current
   // state, so its options have to follow what just happened.
-  await republishDevices();
+  await afterContainerChanged();
 });
 
 // --- Polling: Gladys asks to refresh one container ---------------------------
@@ -68,8 +76,35 @@ gladys.onAction('test_connection', () => testConnection(registry, config));
 gladys.onAction('list_containers', () => listMatchingContainers(registry, config));
 gladys.onAction('restart_container', async (fields) => {
   const message = await restartChosenContainer(gladys, registry, config, fields.device);
-  await republishDevices();
+  await afterContainerChanged();
   return message;
+});
+
+// --- Dashboard widgets -------------------------------------------------------
+// Gladys pulls a content when a dashboard shows the card, and caches it per
+// settings, language and units. Both handlers read the registry, never the
+// daemon directly: the list is already cached, and the CPU / memory numbers
+// come from the last poll.
+gladys.onWidgetGet(CONTAINERS_WIDGET, (options) =>
+  buildContainersContent(registry, config, options),
+);
+
+gladys.onWidgetGet(CONTAINER_WIDGET, (options) =>
+  buildContainerContent(gladys, registry, config, options),
+);
+
+// The overview offers one button, and only when a single container is
+// misbehaving: restart that one. The container name travels in the action
+// params, which the core allowlists from the content it last served — it is
+// never user input.
+gladys.onWidgetAction(CONTAINERS_WIDGET, async (actionKey, params) => {
+  if (actionKey !== RESTART_ACTION) {
+    throw new Error(`Unknown widget action "${actionKey}"`);
+  }
+  const container = await restartContainerByName(String(params.container ?? ''));
+  // The handler is not told the user's language, so the toast carries both and
+  // the core picks.
+  return restartedMessage(container.name);
 });
 
 // --- Configuration updated by the user ---------------------------------------
@@ -158,6 +193,38 @@ async function refreshDevices() {
           },
     );
   }
+}
+
+/**
+ * Restart the container behind a name coming from a widget action.
+ * @param {string} containerName - Container name carried by the action params.
+ * @returns {Promise<object>} The container as the daemon reports it afterwards.
+ */
+async function restartContainerByName(containerName) {
+  const externalId = registry.externalIdOf(containerName);
+  const confirmed = await setContainerValue(gladys, registry, config, {
+    device: { external_id: externalId },
+    feature: { external_id: `${externalId}:${FEATURE.RESTART}` },
+    value: 1,
+  });
+  await afterContainerChanged();
+  return confirmed;
+}
+
+/**
+ * What every path that changes a container has to do afterwards: refresh the
+ * action select's choices, and nudge the overview widget so the card the user
+ * is looking at stops showing the state from before their tap.
+ * @returns {Promise<void>} Resolves once Gladys has been told.
+ */
+async function afterContainerChanged() {
+  await republishDevices();
+  // Fire-and-forget, rate-limited core-side to one per ten seconds. The
+  // single-container widget needs no nudge: its tiles are bound to device
+  // features and move with the published states. The CPU figure stays the one
+  // of the last poll for up to a minute, but a container that just stopped
+  // shows its state instead of a reading, so nothing stale is displayed.
+  gladys.requestWidgetRefresh(CONTAINERS_WIDGET);
 }
 
 /**

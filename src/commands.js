@@ -64,6 +64,14 @@ export async function pollContainerDevice(gladys, registry, config, device) {
     }
   }
 
+  // Keep the reading for the widgets. A stopped container records an empty one
+  // on purpose: leaving the last value would have the overview show a busy CPU
+  // for something that is not running.
+  registry.rememberStats(container.name, {
+    cpuPercent: stats.cpuPercent ?? null,
+    memoryMb: stats.memoryMb ?? null,
+  });
+
   await gladys.publishStates(buildContainerStates(gladys, container, stats));
 }
 

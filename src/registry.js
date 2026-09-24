@@ -39,6 +39,11 @@ export function createRegistry(gladys, { createClient = createDockerClient } = {
   let pendingAt = 0;
   let reachable = false;
   let lastError = null;
+  // Last CPU / memory reading of each container, keyed by container name.
+  // Filled by the pollers; read by the overview widget, which must render
+  // numbers for every container at once and cannot afford a stats call each
+  // (about a second of daemon time apiece).
+  let statsByName = new Map();
 
   /**
    * The Docker client for the current configuration, rebuilt only when the
@@ -104,9 +109,39 @@ export function createRegistry(gladys, { createClient = createDockerClient } = {
     getClient,
     list,
 
+    /**
+     * Remember the last reading of a container, so the widgets can show a
+     * number without going back to the daemon.
+     * @param {string} containerName - Docker container name.
+     * @param {{ cpuPercent: number|null, memoryMb: number|null }} stats - Readings.
+     */
+    rememberStats(containerName, stats) {
+      statsByName.set(containerName, { ...stats, at: Date.now() });
+    },
+
+    /**
+     * The last reading of a container, or an empty object when none was taken
+     * yet — a container polled for the first time, or stopped since startup.
+     * @param {string} containerName - Docker container name.
+     * @returns {{ cpuPercent?: number|null, memoryMb?: number|null, at?: number }} Last readings.
+     */
+    statsFor(containerName) {
+      return statsByName.get(containerName) ?? {};
+    },
+
     /** @returns {object[]} The containers of the last successful read. */
     containers() {
       return containers;
+    },
+
+    /**
+     * The device external_id of a container name — the identifier a widget
+     * setting (`source: "devices"`) hands back when the user picks a device.
+     * @param {string} containerName - Docker container name.
+     * @returns {string} Device external_id.
+     */
+    externalIdOf(containerName) {
+      return containerExternalIds(gladys, containerName).device;
     },
 
     /**

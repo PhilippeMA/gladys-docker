@@ -26,6 +26,26 @@ Plus three buttons in the Configuration screen: **Test the Docker connection**,
 Containers are discovered on their own — the list is re-read on a timer, so a
 container created after installation shows up without any action.
 
+## Dashboard widgets
+
+Two cards, declared in the manifest `widgets` field (**Gladys 5.1+**, SDK 0.14+):
+
+- **`containers`** — the overview: five tiles of totals, then one status row per
+  container (state, CPU, memory), problems first. Settings pick which
+  containers and the order. A contextual button offers to restart the one
+  container that is misbehaving, when there is exactly one.
+- **`container`** — one container chosen per instance through a
+  `source: "devices"` setting: live CPU and memory tiles bound to the device
+  features, its state and image, and Start / Stop / Restart buttons bound to the
+  push features (so Gladys drives the command, the active state and the live
+  updates).
+
+The split is forced by the vocabulary, not by taste: no list component carries a
+control per row, and a card holds at most 8 components, 6 tiles, 1 status and 4
+buttons. `test/helpers/widgetContract.js` runs the SDK's own
+`validateWidgetContent` over every content shape, so anything Gladys would drop
+or truncate fails the build instead of quietly rendering wrong.
+
 ## How it reaches Docker
 
 Gladys runs each external integration in a sandbox that mounts **no host path**,
@@ -73,8 +93,13 @@ Exactly six endpoints are used, all of them listed at the top of
 │  │  ├─ api.js                      #   the six endpoints used, and nothing else
 │  │  ├─ containers.js               #   normalization + include / exclude filters
 │  │  └─ stats.js                    #   CPU % and memory, computed like docker stats
-│  └─ devices/
-│     └─ container.js                # what one container looks like to Gladys
+│  ├─ devices/
+│  │  └─ container.js                # what one container looks like to Gladys
+│  └─ widgets/
+│     ├─ containersWidget.js         #   the overview card
+│     ├─ containerWidget.js          #   the per-container control card
+│     ├─ format.js                   #   bounded strings for the widget slots
+│     └─ i18n.js                     #   the words the cards put on screen
 ├─ docs/en.md, docs/fr.md            # user documentation, re-hosted by Gladys
 ├─ gladys-assistant-integration.json # manifest (name, config schema, image…)
 ├─ Dockerfile                        # Node 24 Alpine, read-only rootfs ready
